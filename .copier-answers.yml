@@ -1,0 +1,24 @@
+# Changes here will be overwritten by Copier
+_commit: v2.0.5
+_src_path: gh:lincc-frameworks/python-project-template
+author_email: kaylee.de_soto@cfa.harvard.edu
+author_name: kdesoto-astro
+create_example_module: false
+custom_install: true
+enforce_style:
+- ruff_lint
+- ruff_format
+failure_notification: []
+include_benchmarks: false
+include_docs: true
+include_notebooks: true
+mypy_type_checking: basic
+package_name: decat_obsplan_generator
+project_license: MIT
+project_name: decat-obsplan-generator
+project_organization: kdesoto-astro
+python_versions:
+- '3.9'
+- '3.10'
+- '3.11'
+- '3.12'
