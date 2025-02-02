@@ -39,6 +39,11 @@ class AirmassCalculator:
         self._ha_grid = _ha_grid.ravel()
         self._dec_grid = _dec_grid.ravel()
 
+    def _get_hour_angles(ra, times):
+        """Convert RA value to hour angles.
+        """
+        return self._loc.local_sidereal_time(times).degree - ra.to(u.deg).value
+
     def generate_airmass_grid(self):
         """From grid of hour angles and declinations, generate"""
         dummy_time = Time.now()  # just to convert from HA to RA and back
@@ -66,9 +71,7 @@ class AirmassCalculator:
         """From a RA/dec and set of times,
         retrieve set of airmasses from cache.
         """
-        sidereal_degs = self._loc.local_sidereal_time(times).degree
-        hour_angles = sidereal_degs - ra.degree
-
+        hour_angles = self._get_hour_angles(ra, times)
         return self._query_from_ha_dec(hour_angles, dec.degree)
 
     def _query_from_ha_dec(self, ha, dec):
@@ -77,7 +80,7 @@ class AirmassCalculator:
             raise TypeError("dec must be a scalar")
 
         if dec >= 40.0:  # out of bounds
-            return np.nan
+            return np.nan * np.ones(len(ha))
 
         # take absolute values, airmasses symmetric around HA
         abs_ha = np.atleast_1d(np.abs(ha))
@@ -104,6 +107,30 @@ class AirmassCalculator:
         """
         return ((ra_arr - ra2) * np.cos((dec_arr + dec2) * np.pi / 360.0)) ** 2 + (dec_arr - dec2) ** 2
 
+    def _query_direct(self, times, ra, dec):
+        """Directly query airmass from RA/dec.
+        For comparison to caching runtime.
+        """
+        coord = SkyCoord(ra=ra, dec=dec)
+        airmasses = self._loc.altaz(time=times, target=coord).secz
+        airmasses[(airmasses < 0.0) | (airmasses > 5.0)] = np.nan
+        return airmasses
+
+    def observable_range(self, ra, dec, start_time, end_time, max_airmass=1.8):
+        """Find the min and max observable time within a certain
+        time range such that the object is above a given airmass.
+        """
+        time_linspace = start_time + np.linspace(
+            0, (end_time - start_time).to(u.hour).value, num=500
+        ) * u.hour
+        hour_angles = self._get_hour_angles(ra, time_linspace)
+        airmasses = self._query_from_ha_dec(hour_angles, dec.to(u.deg).value)
+        visible_ha = hour_angles[airmasses < max_airmass]
+        earliest_time = visible_ha[0] + ra.to(u.deg).value
+        latest_time = visible_ha[-1] + ra.to(u.deg).value
+        return earliest_time, latest_time
+
+
     def plot_airmass(self, fig, ax, ra, dec, times=None, **plot_kwargs):
         """Add airmass plot to ax, assuming
         target is at RA/Dec. If times is None, plot
@@ -116,7 +143,9 @@ class AirmassCalculator:
         else:
             time_arr = np.atleast_1d(times)
 
-        hour_angles = self._loc.local_sidereal_time(time_arr).degree - ra.to(u.deg).value
+        #airmasses = self._query_direct(time_arr, ra, dec)
+
+        hour_angles = self._get_hour_angles(ra, time_arr)
         airmasses = self._query_from_ha_dec(hour_angles, dec.to(u.deg).value)
 
         ax.plot(time_arr.to_datetime(), airmasses, **plot_kwargs)
