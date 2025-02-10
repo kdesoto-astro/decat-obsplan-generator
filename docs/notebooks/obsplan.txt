@@ -1,0 +1,73 @@
+MOON ILLUMINATION: 0.25
+---------------------------------------------------
+UT -10 deg twilight:	02/03 00:27	|	02/03 09:26
+UT -12 deg twilight:	02/03 00:37	|	02/03 09:16
+UT -14 deg twilight:	02/03 00:48	|	02/03 09:06
+UT -16 deg twilight:	02/03 00:58	|	02/03 08:55
+---------------------------------------------------
+LOCAL -10 deg twilight:	02/02 21:27	|	02/03 06:26
+LOCAL -12 deg twilight:	02/02 21:37	|	02/03 06:16
+LOCAL -14 deg twilight:	02/02 21:48	|	02/03 06:06
+LOCAL -16 deg twilight:	02/02 21:58	|	02/03 05:55
+---------------------------------------------------
+LOCAL night MIDPOINT: 02/03 01:57
+
+*********************************************
+*** ALL TIMES BELOW IN LOCAL CHILEAN TIME!*** 
+*** Note: Local Chilean time is now EDT+2 ***
+*********************************************
+
+*********************************************************
+*** WHAT TO DO IF YOU FALL BEHIND SCHEDULE:
+*** This can happen for various reasons (technical issues, scheduling mistakes etc).
+*** Look for targets that are marked OPTIONAL, and skip when you get to them.
+*** Stay within targets' time windows if you adjust schedule!!!
+*********************************************************
+
+**** PLEASE READ ABOVE ^^^^^^^^ BEFORE OBSERVING
+
+
+!!! 21:48
+YSE 296 [18 -17] (7 min)                                             ------> BEFORE 21:58
+AGN C3 [53 -28] (9 min)                                              ------> BEFORE 00:32
+YSE ECDFS [53 -28] (9 min)                                           ------> BEFORE 00:34
+YSE 2025zi [55 -26] (4 min)                                          ------> BEFORE 00:42
+YSE 253 [61 -25] (18 min)                                            ------> BEFORE 00:53
+YSE 353 [63 -10] (16 min)                                            ------> BEFORE 00:33
+DESIRT DESIRT_80_gr [74 -21] (127 min)                               ------> BEFORE 23:49
+
+!!! 23:32
+YSE EDFS [59 -49] (9 min)                                            ------> BEFORE 01:24
+AGN S-CVZ [90 -67] (9 min)                                           ------> BEFORE 03:37
+YSE 412 [116 -3] (34 min)                                            ------> BEFORE 03:26
+
+!!! 00:03
+YSE 311 [124 -17] (34 min)                                           ------> BEFORE 04:31
+AGN COSMOS [150 2] (29 min)                                          ------> BETWEEN 23:35 and 05:32
+YSE 2024agls [160 0] (5 min)                                         ------> AFTER 00:08
+DOSC 3_OMLApex.250202_i_15-dithpos [167 -25] (90 min)                ------> AFTER 23:39
+
+!!! 01:27
+DOSC 2_OMLApex.250202_r_10-dithpos [167 -25] (59 min)                ------> AFTER 23:39
+
+!!! 01:57
+DOSC 1_OMLApex.250202_g_5-dithpos [167 -25] (28 min)                 ------> AFTER 23:39
+YSE 2025cy [200 -44] (4 min)                                         ------> AFTER 01:26
+EtaCar etale.ec0915.gi.7min [161 -60] (11 min)                       ------> AFTER 22:37
+EtaCar 2024inv [167 11] (6 min)                                      ------> AFTER 01:17
+DOSC 5_ShallowApex.250202_r_5-dithpos [213 -34] (28 min)             ------> AFTER 02:30
+DOSC 6_ShallowApex.250202_i_7-dithpos [213 -32] (40 min)             ------> AFTER 02:32
+
+!!! 03:06
+DOSC 4_ShallowApex.250202_g_3-dithpos [213 -34] (16 min)             ------> AFTER 02:30
+YSE 525 [187 11] (69 min)                                            ------> AFTER 02:36
+
+!!! 03:52
+YSE 376 [222 -9] (36 min)                                            ------> AFTER 03:51
+DESIRT DESIRT_G15_gr [218 -1] (99 min)                               ------> AFTER 03:55
+
+!!! 05:02
+YSE 428 [228 -1] (35 min)                                            ------> AFTER 04:35
+YSE 2025aft [252 -73] (4 min)                                        ------> AFTER 04:42
+EtaCar 2024kce [187 8] (6 min)                                       ------> AFTER 02:26
+EtaCar 2024gy [184 13] (8 min)                                       ------> AFTER 02:34
