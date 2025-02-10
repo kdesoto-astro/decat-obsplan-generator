@@ -96,7 +96,7 @@ class AirmassCalculator:
         differences = np.abs(abs_ha[~oob_mask, np.newaxis] - self._ha_range)
         indices = np.argmin(differences, axis=1)
         nearest_hour_angles = self._ha_range[0, indices]
-        
+
         ha_df = pd.DataFrame({'ha': nearest_hour_angles})
         ha_df['ha_index'] = ha_df.groupby('ha').cumcount()
         dec_df['ha_index'] = dec_df.groupby('ha').cumcount()
