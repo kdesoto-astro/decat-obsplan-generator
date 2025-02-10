@@ -1,0 +1,85 @@
+decat_obsplan_generator.airmass
+===============================
+
+.. py:module:: decat_obsplan_generator.airmass
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   decat_obsplan_generator.airmass.AirmassCalculator
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   decat_obsplan_generator.airmass.ctio_location
+
+
+Module Contents
+---------------
+
+.. py:function:: ctio_location(temperature=5.0 * u.deg_C, pressure=780.0 * u.mbar, relative_humidity=0.5)
+
+   Generate Observer (which inherits from EarthLocation)
+   for CTIO.
+
+
+.. py:class:: AirmassCalculator(location=None)
+
+   Class that performs airmass calculations and caches
+   for later access.
+
+
+   .. py:method:: calculate_airmass(times, coordinate: astropy.coordinates.SkyCoord)
+
+      Return airmass value at specific times
+      for single coordinate.
+
+
+
+   .. py:method:: generate_airmass_grid()
+
+      From grid of hour angles and declinations, generate
+
+
+
+   .. py:method:: load_airmass_grid()
+
+      Load and return airmass grid.
+
+
+
+   .. py:method:: query_airmass(ra, dec, times)
+
+      From a RA/dec and set of times,
+      retrieve set of airmasses from cache.
+
+
+
+   .. py:method:: _query_from_ha_dec(ha, dec)
+
+      Query cache from hour angle(s) and SINGLE declination.
+
+
+
+   .. py:method:: _separation_squared(ra_arr, dec_arr, ra2, dec2)
+
+      Helper function to calculate separation
+      directly from floats in degrees. Assumes
+      small angle approximation.
+
+
+
+   .. py:method:: plot_airmass(fig, ax, ra, dec, times=None, **plot_kwargs)
+
+      Add airmass plot to ax, assuming
+      target is at RA/Dec. If times is None, plot
+      across entire 24 hours from now.
+
+
+

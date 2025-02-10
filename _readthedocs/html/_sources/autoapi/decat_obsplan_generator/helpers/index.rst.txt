@@ -1,0 +1,23 @@
+decat_obsplan_generator.helpers
+===============================
+
+.. py:module:: decat_obsplan_generator.helpers
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   decat_obsplan_generator.helpers.ctio_location
+
+
+Module Contents
+---------------
+
+.. py:function:: ctio_location(temperature=5.0 * u.deg_C, pressure=780.0 * u.mbar, relative_humidity=0.5)
+
+   Generate Observer (which inherits from EarthLocation)
+   for CTIO.
+
+
