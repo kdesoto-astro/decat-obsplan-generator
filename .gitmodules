@@ -1,0 +1,3 @@
+[submodule "decat_pointings"]
+	path = decat_pointings
+	url = git@github.com:gnarayan/decat_pointings.git
