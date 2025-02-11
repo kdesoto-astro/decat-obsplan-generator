@@ -97,16 +97,13 @@ class AirmassCalculator:
         indices = np.argmin(differences, axis=1)
         nearest_hour_angles = self._ha_range[0, indices]
 
-        ha_df = pd.DataFrame({'ha': nearest_hour_angles})
-        ha_df['ha_index'] = ha_df.groupby('ha').cumcount()
-        dec_df['ha_index'] = dec_df.groupby('ha').cumcount()
+        ha_df = pd.DataFrame({'ha': nearest_hour_angles, 'original_index': range(len(nearest_hour_angles))})
+        dec_df = dec_df.sort_values('ha').reset_index(drop=True)
+        merged_df = pd.merge(ha_df, dec_df, on='ha', how='left')
+        merged_df = merged_df.sort_values('original_index').reset_index(drop=True)
 
-        # Merge on 'ha' and 'count'
-        merged_df = pd.merge(ha_df, dec_df, on=['ha', 'ha_index'], how='left')
-
-        # Extract the airmass column, which is our result
+        # Extract airmasses
         airmasses = merged_df['airmass'].to_numpy()
-
         airmasses_full = np.nan * np.ones(len(abs_ha))
         airmasses_full[~oob_mask] = airmasses
 
@@ -162,8 +159,6 @@ class AirmassCalculator:
         else:
             time_arr = np.atleast_1d(times)
 
-        # airmasses = self._query_direct(time_arr, ra, dec)
-
         hour_angles = self._get_hour_angles(ra, time_arr)
         airmasses = self._query_from_ha_dec(hour_angles, dec.to(u.deg).value)
 
@@ -171,9 +166,10 @@ class AirmassCalculator:
 
         # Formatting x-axis ticks to the desired format
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
-        ax.invert_yaxis()
         ax.set_ylabel("Airmass")
+        ax.set_xlabel("UT")
         ax.axhline(1.8, linestyle="dashed", color="grey")
+        ax.axhline(2.0, linestyle="dashed", color="red")
 
         # Auto-format the x-axis for better readability
         fig.autofmt_xdate()

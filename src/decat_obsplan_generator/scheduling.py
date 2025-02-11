@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import pandas as pd
+import matplotlib.pyplot as plt
 import warnings
 
 import astropy.units as u
@@ -50,8 +51,7 @@ def generate_nightly_schedule(directory, date=None, observer=None):
     airmass_calc.load_airmass_grid()
 
     all_ids = []
-
-    for fn in get_all_jsons_from_directory(directory, date):
+    for fn, prio in zip(*get_all_jsons_from_directory(directory, date)):
         names, jsons, propids, ras, decs, exptimes = read_json(fn)
         if jsons is None:
             print(f"Skipped: {fn}")
@@ -86,7 +86,7 @@ def generate_nightly_schedule(directory, date=None, observer=None):
             "dur": dur * u.min,
             "early_limit": early_limit2,
             "late_limit": late_limit2,
-            "prio": 0, #TODO: UPDATE
+            "prio": prio,
             "propid": propids[0]
         }
 
@@ -100,7 +100,7 @@ def generate_nightly_schedule(directory, date=None, observer=None):
         all_ids.append(name)
         blocks.append(block)
 
-    schedule = DECATSchedule(night_start, night_end, blocks, observer=observer)
+    schedule = DECATSchedule(date, night_start, night_end, blocks, observer=observer)
     return schedule
 
 
@@ -109,10 +109,11 @@ class DECATSchedule:
     allocated times.
     """
 
-    def __init__(self, start_time, end_time, all_blocks, observer=None):
+    def __init__(self, date, start_time, end_time, all_blocks, observer=None):
         """Adds program time dictionary."""
         self.start_time = start_time
         self.end_time = end_time
+        self.date = date
 
         if observer is None:
             self.observer = ctio_location()
@@ -131,7 +132,8 @@ class DECATSchedule:
         self._df = pd.DataFrame.from_records(all_blocks)
         self._df.loc[:,[
             't_start', 't_end', 'secz_i', 'secz_f', 'slew_s',
-            'order', 'eff_prio', 'current_time'
+            'order', 'eff_prio', 'current_time',
+            't_start_hidden', 't_end_hidden'
         ]] = pd.NA
         self._df.set_index('name', inplace=True)
 
@@ -176,19 +178,19 @@ class DECATSchedule:
 
         for i in range(max_order + 1):
             if i == 0:
-                self._df.loc[self._df.order == i, 't_start'] = self.start_time
+                self._df.loc[self._df.order == i, 't_start_hidden'] = self.start_time
                 self._df.loc[self._df.order == i, 'slew_s'] = pd.Timedelta(0., unit='m')
-                self._df.loc[self._df.order == i, 't_end'] = self.start_time + self._df.loc[self._df.order == i, 'dur']
+                self._df.loc[self._df.order == i, 't_end_hidden'] = self.start_time + self._df.loc[self._df.order == i, 'dur']
             else:
                 # calculate slew time
                 prev_coord = self._df.loc[self._df.order == i - 1, 'coord'].item()
                 curr_coord = self._df.loc[self._df.order == i, 'coord'].item()
                 slew_time = self._slew_time(prev_coord, curr_coord)
 
-                prev_t_end = self._df.loc[self._df.order == i - 1, 't_end'].item()
-                self._df.loc[self._df.order == i, 't_start'] = prev_t_end
+                prev_t_end = self._df.loc[self._df.order == i - 1, 't_end_hidden'].item()
+                self._df.loc[self._df.order == i, 't_start_hidden'] = prev_t_end
                 self._df.loc[self._df.order == i, 'slew_s'] = slew_time
-                self._df.loc[self._df.order == i, 't_end'] = prev_t_end + self._df.loc[self._df.order == i, 'dur'] + slew_time
+                self._df.loc[self._df.order == i, 't_end_hidden'] = prev_t_end + self._df.loc[self._df.order == i, 'dur'] + slew_time
 
         self._update_airmasses()
 
@@ -197,14 +199,14 @@ class DECATSchedule:
         """Update airmasses of generated schedule.
         """
         self._df['secz_i'] = [
-            round(self.ac.query(row.t_start, row.ra, row.dec)[0], 2) for row in self._df.itertuples()
+            round(self.ac.query(row.t_start_hidden, row.ra, row.dec)[0], 2) for row in self._df.itertuples()
         ]
         self._df['secz_f'] = [
-            round(self.ac.query(row.t_end, row.ra, row.dec)[0], 2) for row in self._df.itertuples()
+            round(self.ac.query(row.t_end_hidden, row.ra, row.dec)[0], 2) for row in self._df.itertuples()
         ]
 
         #underground_mask = self._df.secz_i.isna() | self._df.secz_f.isna()
-        daylight_mask = (self._df.t_end > self.end_time) | (self._df.t_start < self.start_time)
+        daylight_mask = (self._df.t_end > self.end_time) | (self._df.t_start_hidden < self.start_time)
         not_visible_mask = daylight_mask #| underground_mask
 
         # formatting
@@ -212,10 +214,10 @@ class DECATSchedule:
         self._df.loc[not_visible_mask, ['secz_i', 'secz_f', 'order']] = pd.NA
         self._df.loc[not_visible_mask, 'slew_s'] = pd.Timedelta(0., unit='m')
 
-        self._df.loc[~not_visible_mask, 't_start'] = self._df.loc[~not_visible_mask, 't_start'].apply(
+        self._df.loc[~not_visible_mask, 't_start'] = self._df.loc[~not_visible_mask, 't_start_hidden'].apply(
             universal_to_local_time, args=(self.observer,)
         )
-        self._df.loc[~not_visible_mask, 't_end'] = self._df.loc[~not_visible_mask, 't_end'].apply(
+        self._df.loc[~not_visible_mask, 't_end'] = self._df.loc[~not_visible_mask, 't_end_hidden'].apply(
             universal_to_local_time, args=(self.observer,)
         )
         self._df.loc[~not_visible_mask, 't_start'] = self._df.loc[~not_visible_mask, 't_start'].apply(
@@ -230,7 +232,6 @@ class DECATSchedule:
         )
 
         self._df.sort_values(by='order', inplace=True)
-
 
 
     def move_target(self, name, order):
@@ -255,7 +256,7 @@ class DECATSchedule:
 
         self._df.loc[self._df.order > prev_order, "order"] -= 1
         self._df.loc[name, ["order", "secz_i", "secz_f"]] = pd.NA
-        self._df.loc[name, ["t_start", "t_end"]] = pd.NaT
+        self._df.loc[name, ["t_start", "t_end", "t_start_hidden", "t_end_hidden"]] = pd.NaT
         self._df.loc[name, "slew_s"] = pd.Timedelta(0., unit='m')
 
         self._update_obs_times()
@@ -321,7 +322,7 @@ class DECATSchedule:
         # reset
         self._df['cumul_program_time'] = 0
         self._df.loc[:,[
-            't_start', 't_end', 'secz_i',
+            't_start_hidden', 't_end_hidden', 'secz_i',
             'secz_f', 'order', 'eff_prio',
         ]] = pd.NA
         self._df['slew_s'] = pd.Timedelta(minutes=0.0)
@@ -356,10 +357,10 @@ class DECATSchedule:
                 self._df.current_time += pd.Timedelta(5.0, unit='m')  # no good target, add gap
                 continue
             
-            self._df.loc[best_target, 't_start'] = self._df.current_time[0]
+            self._df.loc[best_target, 't_start_hidden'] = self._df.current_time[0]
             self._df.current_time += self._df.loc[best_target, 'slew_s']
             self._df.current_time += pd.Timedelta(self._df.loc[best_target, 'dur'].value, unit='m')
-            self._df.loc[best_target, 't_end'] = self._df.current_time[0]
+            self._df.loc[best_target, 't_end_hidden'] = self._df.current_time[0]
             self._df.loc[best_target, 'order'] = current_order
             current_order += 1
 
@@ -368,7 +369,7 @@ class DECATSchedule:
         self._df.loc[
             self._df.order.isna(),
             [
-                't_start', 't_end', 'secz_i',
+                't_start_hidden', 't_end_hidden', 'secz_i',
                 'secz_f', 'eff_prio',
             ]
 
@@ -427,56 +428,79 @@ class DECATSchedule:
     def to_obsplan_file(self, fn):
         """Generate obsplan file for specific schedule.
         """
-        observer = ctio_location()
         self._write_obsplan_header(fn)
         column_width = 70
         num_mins = -61
+        cumul_dur = 0
 
-        for i, slot in enumerate(self.slots):
-            if not (slot.block and hasattr(slot.block, "name")):
-                continue
+        for entry in self._df.loc[~self._df.order.isna()].itertuples():
+            start_time = entry.t_start
+            dur = entry.dur.value + entry.slew_s / 60.
 
-            start_time = universal_to_local_time(slot.start, observer).strftime('%H:%M')
-            dur = slot.dur.to(u.minute).value
+            name = entry.json
+            pname = entry.program
+            ra = round(entry.ra.value)
+            dec = round(entry.dec.value)
 
-            name = slot.block.name
-            pname = self.program_names[slot.block.program]
-            ra = round(slot.block.ra.value)
-            dec = round(slot.block.dec.value)
-            if (i > 0):
-                prev = self.slots[i-1]
-                # incorporate slew time
-                if prev.block and not hasattr(prev.block, 'name'):
-                    start_time = universal_to_local_time(self.slots[i-1].start, observer).strftime('%H:%M')
-                    dur += slot.dur.to(u.minute).value
-
-            if (slot.start - self.start_time).to(u.min).value > num_mins + 60:
+            if cumul_dur > num_mins + 60:
                 with open(fn, "a") as f:
                     f.write(f"\n\n!!! {start_time}")
                 num_mins += 60
 
-            if slot.block.earliest_time == self.start_time:
-                if slot.block.latest_time < self.end_time:
-                    latest = (slot.block.latest_time - dur * u.min)
-                    latest_local = universal_to_local_time(latest, observer).strftime('%H:%M')
+            if entry.early_limit == self.start_time:
+                if entry.late_limit < self.end_time:
+                    latest = (entry.late_limit - dur * u.min)
+                    latest_local = universal_to_local_time(latest, self.observer).strftime('%H:%M')
                     with open(fn, "a") as f:
                         f.write((f"\n{pname} {name} [{ra} {dec}] ({round(dur)} min)").ljust(column_width))
-                        f.write(f"------> BEFORE {latest_local}")
-            elif slot.block.latest_time == self.end_time:
-                if slot.block.earliest_time > self.start_time:
-                    earliest = slot.block.earliest_time
-                    earliest_local = universal_to_local_time(earliest, observer).strftime('%H:%M')
+                        f.write(f"------> SLEW BEFORE {latest_local}")
+            elif entry.late_limit == self.end_time:
+                if entry.early_limit > self.start_time:
+                    earliest_local = universal_to_local_time(entry.early_limit, self.observer).strftime('%H:%M')
                     with open(fn, "a") as f:
                         f.write((f"\n{pname} {name} [{ra} {dec}] ({round(dur)} min)").ljust(column_width))
-                        f.write(f"------> AFTER {earliest_local}")
+                        f.write(f"------> SLEW AFTER {earliest_local}")
             else:
-                latest = (slot.block.latest_time - dur * u.min)
-                latest_local = universal_to_local_time(latest, observer).strftime('%H:%M')
-                earliest = slot.block.earliest_time
-                earliest_local = universal_to_local_time(earliest, observer).strftime('%H:%M')
+                latest = (entry.late_limit - dur * u.min)
+                latest_local = universal_to_local_time(latest, self.observer).strftime('%H:%M')
+                earliest = entry.early_limit
+                earliest_local = universal_to_local_time(earliest, self.observer).strftime('%H:%M')
                 with open(fn, "a") as f:
                     f.write((f"\n{pname} {name} [{ra} {dec}] ({round(dur)} min)").ljust(column_width))
-                    f.write(f"------> BETWEEN {earliest_local} and {latest_local}")
+                    f.write(f"------> SLEW BETWEEN {earliest_local} and {latest_local}")
+
+            cumul_dur += dur
+
+    def save(self):
+        """Save in directory (date)."""
+        save_dir = f"../../decat_pointings/2025A/{self.date}"
+        obsplan_fn = os.path.join(save_dir, f"{self.date}_obsplan.txt")
+        full_table_fn = os.path.join(save_dir, f"{self.date}_all_targets.csv")
+        self._df[self._display_columns].to_csv(full_table_fn)
+        self.to_obsplan_file(obsplan_fn)
+        print(f"Obsplan and table saved to {save_dir}")
+
+    def display_airmass_plot(self, name):
+        """Display the airmass plot for [name].
+        """
+        fig, ax = plt.subplots()
+        ra = self._df.loc[name, 'ra']
+        dec = self._df.loc[name, 'dec']
+
+        st = self._df.loc[name, 't_start_hidden']
+        et = self._df.loc[name, 't_end_hidden']
+        time_linspace = (
+            self.start_time + np.linspace(0, (self.end_time - self.start_time).to(u.hour).value, num=500) * u.hour
+        )
+        time_linspace2 = (
+            st + np.linspace(0, (et - st).to(u.hour).value, num=500) * u.hour
+        )
+        self.ac.plot_airmass(fig, ax, ra, dec, times=time_linspace, linewidth=1, color='black')
+        self.ac.plot_airmass(fig, ax, ra, dec, times=time_linspace2, linewidth=5, color='chartreuse')
+        ax.invert_yaxis()
+        plt.show()
+
+    
 
 
 def main_loop():
@@ -488,13 +512,14 @@ def main_loop():
     if len(date) != 6:
         date = today_date
 
-    directory = "../../data/json_files/2025A"
+    directory = "../../decat_pointings/json_files/2025A"
     schedule = generate_nightly_schedule(directory, date=date, observer=observer)
     schedule.generate_optimal_schedule()
     schedule.display()
+    print('\n')
 
     while True:
-        command = input("Enter command (increase/decrease) and amount, 'help' for list of commands, or 'bye' to quit: ")
+        command = input("Enter command, 'help' for list of commands, or 'bye' to quit: ")
         if command.strip() == 'bye':
             break
         if command.strip() == 'help':
@@ -504,6 +529,8 @@ def main_loop():
             print("add [target_name] : Add [target_name] to observing queue without specifying slot. Target is inserted after closest target already being observed.")
             print("remove [target_name] : Remove [target_name] from observing queue. Equivalent to setting 'order' to NA.")
             print("optimize : Reset all manual assignments, generate schedule based on positions and slew transitions.")
+            print("airmass [target_name] : Display airmass plot for [target_name] based on current observing window.")
+            print("save : Save target table and obsplan txt to folder in decat_pointings.")
             continue
 
         parts = command.split()
@@ -556,10 +583,28 @@ def main_loop():
                 continue
             schedule.generate_optimal_schedule()
 
-        else:
-            raise ValueError("Invalid command! Type 'help' for options.")
+        elif parts[0] == 'save':
+            if len(parts) != 1:
+                print("Invalid command: wrong number of inputs.")
+            schedule.save()
+            continue
 
+        elif parts[0] == 'airmass':
+            if len(parts) != 2:
+                print("Invalid command: wrong number of inputs.")
+            try:
+                schedule.display_airmass_plot(parts[1])
+            except:
+                print("Invalid command: invalid inputs.")
+            continue
+
+        else:
+            print("Invalid command! Type 'help' for options.")
+            continue
+
+        print('\n')
         schedule.display()
+        print('\n')
 
 if __name__ == "__main__":
     main_loop()

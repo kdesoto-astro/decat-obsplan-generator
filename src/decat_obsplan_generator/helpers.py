@@ -197,7 +197,18 @@ def get_all_jsons_from_directory(directory, date):
     """From directory and date, extract all jsons
     from directory associated with that date.
     """
-    return glob.glob(
+    base_jsons = glob.glob(
         os.path.join(directory, "*", date, "*.json")
     )
+    prios = [0,] * len(base_jsons)
+
+    # get all jsons in lower-prio subdirectories
+    low_prio_jsons = glob.glob(
+        os.path.join(directory, "*", date, "*", "*.json")
+    )
+    for json in low_prio_jsons:
+        prios.append(int(json.split("/")[-2]))
+
+    return base_jsons + low_prio_jsons, prios
+
 
