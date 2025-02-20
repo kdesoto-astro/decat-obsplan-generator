@@ -200,7 +200,14 @@ def get_all_jsons_from_directory(directory, date):
     base_jsons = glob.glob(
         os.path.join(directory, "*", date, "*.json")
     )
-    prios = [0,] * len(base_jsons)
+    prios = []
+    for json in base_jsons:
+        base_name = json.split("/")[-1][:-5]
+        prefix = base_name.split("_")[-1]
+        if prefix[0] == "P":
+            prios.append(int(prefix[1]) - 1)
+        else:
+            prios.append(0)
 
     # get all jsons in lower-prio subdirectories
     low_prio_jsons = glob.glob(

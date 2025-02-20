@@ -206,7 +206,7 @@ class DECATSchedule:
         ]
 
         #underground_mask = self._df.secz_i.isna() | self._df.secz_f.isna()
-        daylight_mask = (self._df.t_end > self.end_time) | (self._df.t_start_hidden < self.start_time)
+        daylight_mask = (self._df.t_end_hidden > self.end_time) | (self._df.t_start_hidden < self.start_time)
         not_visible_mask = daylight_mask #| underground_mask
 
         # formatting
@@ -238,6 +238,9 @@ class DECATSchedule:
         """Move target to spot 'order'. Move all targets that were before it
         one spot down."""
         prev_order = self._df.loc[name, "order"]
+
+        if pd.isna(prev_order):
+            prev_order = 9999
 
         if order < prev_order:
             self._df.loc[(self._df.order < prev_order) & (self._df.order >= order), "order"] += 1
@@ -315,7 +318,7 @@ class DECATSchedule:
         self._df.loc[self._df.program == program, 'prio'] = prio
 
 
-    def generate_optimal_schedule(self):
+    def generate_optimal_schedule(self, with_priorities=True):
         """Optimize observing program based on prio,
         transition times, and time in sky.
         """
@@ -348,7 +351,12 @@ class DECATSchedule:
             too_late_mask = self._df.current_time > self._df.late_limit - self._df.slew_s - self._df.dur
             
             obs_time_left = (self._df.late_limit - self._df.current_time)
-            self._df['eff_prio'] = (20. * self._df.slew_s + obs_time_left) / total_time + 10 * self._df.prio
+
+            if with_priorities:
+                self._df['eff_prio'] = (20. * self._df.slew_s + obs_time_left) / total_time + 10 * self._df.prio
+            else:
+                self._df['eff_prio'] = (20. * self._df.slew_s + obs_time_left) / total_time
+
             self._df.loc[~unscheduled_mask | (too_early_mask | too_late_mask), 'eff_prio'] = 9999.
 
             best_target = self._df.eff_prio.idxmin()
@@ -479,6 +487,7 @@ class DECATSchedule:
         self._df[self._display_columns].to_csv(full_table_fn)
         self.to_obsplan_file(obsplan_fn)
         print(f"Obsplan and table saved to {save_dir}")
+        
 
     def display_airmass_plot(self, name):
         """Display the airmass plot for [name].
@@ -514,7 +523,7 @@ def main_loop():
 
     directory = "../../decat_pointings/json_files/2025A"
     schedule = generate_nightly_schedule(directory, date=date, observer=observer)
-    schedule.generate_optimal_schedule()
+    schedule.generate_optimal_schedule(with_priorities=False)
     schedule.display()
     print('\n')
 
@@ -581,7 +590,13 @@ def main_loop():
             if len(parts) != 1:
                 print("Invalid command: wrong number of inputs.")
                 continue
-            schedule.generate_optimal_schedule()
+            schedule.generate_optimal_schedule(with_priorities=False)
+
+        elif parts[0] == 'optimize-prio':
+            if len(parts) != 1:
+                print("Invalid command: wrong number of inputs.")
+                continue
+            schedule.generate_optimal_schedule(with_priorities=True)
 
         elif parts[0] == 'save':
             if len(parts) != 1:
