@@ -4,10 +4,12 @@ from pathlib import Path
 
 import astropy.units as u
 import matplotlib.dates as mdates
+import seaborn as sns
 import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+import matplotlib.pyplot as plt
 
 from .helpers import ctio_location
 
@@ -147,31 +149,114 @@ class AirmassCalculator:
 
         return visible_times[0], visible_times[-1]
 
-    def plot_airmass(self, fig, ax, ra, dec, times=None, **plot_kwargs):
+    def _plot_single_airmass(self, ax, ra, dec, times, **plot_kwargs):
         """Add airmass plot to ax, assuming
         target is at RA/Dec. If times is None, plot
         across entire 24 hours from now.
         """
-        if times is None:
-            start_time = Time.now()
-            delta_times = np.linspace(0, 24.0, num=500) * u.hour
-            time_arr = start_time + delta_times
-        else:
-            time_arr = np.atleast_1d(times)
-
+        time_arr = np.atleast_1d(times)
         hour_angles = self._get_hour_angles(ra, time_arr)
         airmasses = self._query_from_ha_dec(hour_angles, dec.to(u.deg).value)
 
         ax.plot(time_arr.to_datetime(), airmasses, **plot_kwargs)
 
-        # Formatting x-axis ticks to the desired format
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
-        ax.set_ylabel("Airmass")
-        ax.set_xlabel("UT")
-        ax.axhline(1.8, linestyle="dashed", color="grey")
-        ax.axhline(2.0, linestyle="dashed", color="red")
+        return ax
+    
 
-        # Auto-format the x-axis for better readability
-        fig.autofmt_xdate()
+    def plot_airmass(self, df, start_time, end_time, tz_shifts):
+        """Plot airmass for entire dataframe of targets, highlighting
+        current observing windows.
+        """
+        fig = plt.figure(figsize=(10,4))
+        ax1 = fig.add_subplot(111)
+        ax2 = ax1.twiny()
+        ax3 = ax1.twiny()
+        ax1.invert_yaxis()
+        ax1.set_ylim([2.0, 0.8])
+        ax1.set_ylabel("Relative Air Mass")
+        ax1.set_xlabel("Local Time")
+        ax1.grid(True)
+        ax1.set_axisbelow(True)
 
-        return fig, ax
+        length_of_night = 500
+
+        tz_shift_sidereal, tz_shift_extra = tz_shifts
+
+        full_night_linspace = (
+            start_time
+            + np.linspace(0, (end_time - start_time).to(u.hour).value, num=length_of_night) * u.hour
+        )
+        full_night_sidereal = full_night_linspace + tz_shift_sidereal
+        full_night_extra = full_night_linspace + tz_shift_extra
+
+        ax2.plot(full_night_linspace.to_datetime(), np.zeros(length_of_night))
+        ax2.set_xlabel("UTC")
+        ax2.get_xaxis().set_major_formatter(mdates.DateFormatter('%H:%M'))
+
+        num_ticks = 7
+        nn = round(length_of_night / num_ticks)
+        ax3_ind = [i*nn for i in range(num_ticks)]
+
+        ax3.plot(full_night_sidereal.to_datetime(), np.zeros(length_of_night))
+        ax3_ind.remove(0)
+        ax3.set_xlabel("LST")
+        ax3.xaxis.set_ticks_position("bottom")
+        ax3.xaxis.set_label_position("bottom")
+
+        ax3.set_xticks(full_night_sidereal[ax3_ind].to_datetime())
+        ax3.get_xaxis().set_major_formatter(mdates.DateFormatter('%H:%M'))
+
+        # Offset the twin axis below the host
+        ax3.spines["bottom"].set_position(("axes", -0.18))
+
+        colormap = sns.color_palette("husl", len(df.program.unique()))
+        program_colormap = {k: v for (k, v) in zip(df.program.unique(), colormap)}
+
+        for k in program_colormap:
+            total_time = df.loc[df.program == k, 'dur'].sum()
+            label = f"{k}\nTotal time: {round(total_time.value)} min"
+            ax1.plot(
+                full_night_extra.to_datetime(), np.zeros(length_of_night),
+                color=program_colormap[k],
+                linewidth=3,
+                label=label
+            )
+            
+        ax1.get_xaxis().set_major_formatter(mdates.DateFormatter('%H:%M'))
+
+        for row in df.itertuples():
+            col = program_colormap[row.program]
+
+            if not pd.isna(row.order):
+                st = row.t_start_hidden
+                et = row.t_end_hidden
+                
+                obs_linspace = st + np.linspace(0, (et - st).to(u.hour).value, num=500) * u.hour
+                self._plot_single_airmass(
+                    ax2, row.ra, row.dec, times=obs_linspace,
+                    linewidth=3.0, color=col
+                )
+
+                self._plot_single_airmass(
+                    ax2, row.ra, row.dec,
+                    times=full_night_linspace,
+                    linewidth=3.0, color=col,
+                    alpha=0.1
+                )
+            
+            else:
+                self._plot_single_airmass(
+                    ax2, row.ra, row.dec,
+                    times=full_night_linspace,
+                    linewidth=3.0, color=col,
+                    linestyle='dotted',
+                    alpha=0.3
+                )
+
+        leg = ax1.legend(bbox_to_anchor=(1.01, 1.015), loc='upper left', ncol=1, prop={'size':8})
+        
+        # set the linewidth of each legend object
+        for legobj in leg.legendHandles:
+            legobj.set_linewidth(3.0)
+
+        return fig
