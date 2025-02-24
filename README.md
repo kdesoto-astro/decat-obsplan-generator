@@ -17,32 +17,30 @@ you whether or not you'd like to display it!
 For more information about the project template see the 
 [documentation](https://lincc-ppt.readthedocs.io/en/latest/).
 
-## Dev Guide - Getting Started
+## How to generate schedules
 
-Before installing any dependencies or writing code, it's a great idea to create a
-virtual environment. LINCC-Frameworks engineers primarily use `conda` to manage virtual
-environments. If you have conda installed locally, you can run the following to
-create and activate a new environment.
+This repository connects to decat-pointings to automatically generate nightly obsplans.
+After installing locally via git clone or fork:
 
-```
->> conda create -n <env_name> python=3.10
->> conda activate <env_name>
-```
+* First, you want to navigate to decat-pointings within this directory. Then update your version of the subdirectory using
+>> cd decat-pointings
+>> git pull
+* Next, to generate an optimized observing plan, navigate to src/decat_obsplan_generator, and run the scheduling.py file:
+>> cd src/decat_obsplan_generator
+>> python scheduling.py
+* Press enter to generate schedule for that same night, or change for other nights. An optimized schedule will automatically be generated, displayed, and saved in the nightly folder in decat-pointings.
+* If this schedule looks good, simply navigate back to decat-pointings, git add, commit, and push the changes!
+* If you want to edit this schedule, you can either: (1) modify the order numbers in decat-pointings/{date}/{date}_all_targets.csv. Running scheduling.py after will automatically read in the modified table and generated updated obsplans. (2) use the inline commands (detailed below) to augment the schedule.
+* The table, obsplan, airmass plot, and moon distance plots are all generated and saved in the decat-pointings folder after each edit.
 
-Once you have created a new environment, you can install this project for local
-development using the following commands:
+## Inline commands (after calling scheduling.py)
 
-```
->> ./.setup_dev.sh
->> conda install pandoc
-```
+These commands can be called after "python scheduling.py" brings up the schedule display.
 
-Notes:
-1. `./.setup_dev.sh` will initialize pre-commit for this local repository, so
-   that a set of tests will be run prior to completing a local commit. For more
-   information, see the Python Project Template documentation on 
-   [pre-commit](https://lincc-ppt.readthedocs.io/en/latest/practices/precommit.html)
-2. Install `pandoc` allows you to verify that automatic rendering of Jupyter notebooks
-   into documentation for ReadTheDocs works as expected. For more information, see
-   the Python Project Template documentation on
-   [Sphinx and Python Notebooks](https://lincc-ppt.readthedocs.io/en/latest/practices/sphinx.html#python-notebooks)
+* move {target_name} {order} : moves the target with name target-name to specific order. Adjusts the later targets accordingly.
+* add {target_name} : add target to the schedule. This will try to insert target in the spot that requires the least slewing.
+* remove {target_name} : this will remove the target from the current schedule.
+* swap {target1} {target2} : swap two targets in observing order.
+* optimize : this will generate an optimized schedule based on coordinates and slew times. Priorities are ignored!
+* optimize-prio : same as optimize, but it priorities objects of higher priority first.
+* help : this will show all valid commands
