@@ -1,8 +1,8 @@
 # Where schedule and observing blocks are generated.
 import os
 import warnings
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import astroplan
 import astropy.units as u
@@ -104,10 +104,7 @@ class DECATSchedule:
     allocated times.
     """
 
-    def __init__(
-            self, date, start_time, end_time,
-            all_blocks, observer=None
-        ):
+    def __init__(self, date, start_time, end_time, all_blocks, observer=None):
         """Adds program time dictionary."""
         self.start_time = start_time
         self.end_time = end_time
@@ -163,8 +160,9 @@ class DECATSchedule:
             "secz_f",
         ]
 
-        
-        self._df = self._df[[*self._display_columns, *self._df.columns[~self._df.columns.isin(self._display_columns)]]]
+        self._df = self._df[
+            [*self._display_columns, *self._df.columns[~self._df.columns.isin(self._display_columns)]]
+        ]
         self._df.set_index("name", inplace=True)
 
         self.ac = AirmassCalculator()
@@ -175,14 +173,13 @@ class DECATSchedule:
         self.observer_shift = self.observer.timezone.utcoffset(datetime_date).total_seconds() * u.s
 
         ctio_observer = ctio_location()
-        self.datetime = Time(datetime_date, format='datetime')
+        self.datetime = Time(datetime_date, format="datetime")
         dummy_sidereal_time = ctio_observer.local_sidereal_time(self.datetime).to(u.hourangle)
         self.sidereal_shift = dummy_sidereal_time.hour * u.hour
         self.midnight = self.observer.midnight(self.datetime, which="next")
 
         # moon load
         self.moon = MoonCalculator()
-
 
     def display(self):
         print(self._df[self._display_columns].to_string())
@@ -217,11 +214,11 @@ class DECATSchedule:
                 )
             else:
                 # calculate slew time
-                prev_coord = self._df.loc[self._df.order == all_orders[i-1], "coord"].item()
+                prev_coord = self._df.loc[self._df.order == all_orders[i - 1], "coord"].item()
                 curr_coord = self._df.loc[self._df.order == order, "coord"].item()
                 slew_time = self._slew_time(prev_coord, curr_coord)
 
-                prev_t_end = self._df.loc[self._df.order == all_orders[i-1], "t_end_hidden"].item()
+                prev_t_end = self._df.loc[self._df.order == all_orders[i - 1], "t_end_hidden"].item()
                 self._df.loc[self._df.order == order, "t_start_hidden"] = prev_t_end
                 self._df.loc[self._df.order == order, "slew_s"] = slew_time
                 self._df.loc[self._df.order == order, "t_end_hidden"] = (
@@ -231,38 +228,36 @@ class DECATSchedule:
         self._move_unused_time_to_middle()
         self._update_airmasses()
 
-
     def _move_unused_time_to_middle(self):
         """If gap at end of night, shift targets to end to make empty room
         in middle of night. Cutpoint is either midnight or when targets'
         latest obstime is end of night (whichever is later).
         """
-        obs_end = self._df.loc[~self._df.order.isna(), 't_end_hidden'].max()
+        obs_end = self._df.loc[~self._df.order.isna(), "t_end_hidden"].max()
         unused_time = TimeDelta(self.end_time - obs_end)
-        cutpoint1_mask = np.array([(abs(x - self.end_time) < 1 * u.min) for x in self._df.late_limit]) & ~self._df.order.isna()
-        cutpoint1 = self._df.loc[cutpoint1_mask, 't_start_hidden'].min()
+        cutpoint1_mask = (
+            np.array([(abs(x - self.end_time) < 1 * u.min) for x in self._df.late_limit])
+            & ~self._df.order.isna()
+        )
+        cutpoint1 = self._df.loc[cutpoint1_mask, "t_start_hidden"].min()
         cutpoint = max(cutpoint1, self.midnight)
         mask = (~self._df.order.isna()) & (self._df.t_start_hidden >= cutpoint)
-        self._df.loc[mask, 't_start_hidden'] = [x + unused_time for x in self._df.loc[mask, 't_start_hidden']]
-        self._df.loc[mask, 't_end_hidden'] = [x + unused_time for x in self._df.loc[mask, 't_end_hidden']]
-        
-    
+        self._df.loc[mask, "t_start_hidden"] = [x + unused_time for x in self._df.loc[mask, "t_start_hidden"]]
+        self._df.loc[mask, "t_end_hidden"] = [x + unused_time for x in self._df.loc[mask, "t_end_hidden"]]
+
     def _update_plots(self):
         """Generate airmass + moon distance plots."""
         self.save_airmass_plot()
         self.save_moon_distance_plot()
 
-
     def save_moon_distance_plot(self):
         """Save plot of moon distances."""
         save_dir = f"../../decat_pointings/2025A/{self.date}"
         fig = self.moon.plot_moon_distances(
-            self._df, self.start_time, self.end_time,
-            [self.sidereal_shift, self.observer_shift]
+            self._df, self.start_time, self.end_time, [self.sidereal_shift, self.observer_shift]
         )
-        fig.savefig(os.path.join(save_dir, "moon_distances.png"), bbox_inches='tight', dpi=300)
+        fig.savefig(os.path.join(save_dir, "moon_distances.png"), bbox_inches="tight", dpi=300)
         plt.close()
-
 
     def _update_airmasses(self):
         """Update airmasses of generated schedule."""
@@ -302,7 +297,6 @@ class DECATSchedule:
         self._df.sort_values(by="order", inplace=True)
         self.save()
         self._update_plots()
-
 
     def move_target(self, name, order):
         """Move target to spot 'order'. Move all targets that were before it
@@ -457,7 +451,7 @@ class DECATSchedule:
             current_order += 1
 
         self._reset_unobserved_fields()
-        self._df.loc[:, 'order'] *= 10
+        self._df.loc[:, "order"] *= 10
         self._move_unused_time_to_middle()
         self._update_airmasses()
 
@@ -491,7 +485,6 @@ class DECATSchedule:
         with open(fn, "a") as f:
             f.write(f"\n{MANY_DASHES}\nLOCAL night MIDPOINT: {local_midnight}\n")
             f.write(OBS_PLAN_HEADER)
-
 
     def to_obsplan_file(self, fn):
         """Generate obsplan file for specific schedule."""
@@ -540,13 +533,12 @@ class DECATSchedule:
 
             cumul_dur += dur
 
-    
     def load(self):
         """Load plan from directory (date)."""
         save_dir = f"../../decat_pointings/2025A/{self.date}"
         full_table_fn = os.path.join(save_dir, f"{self.date}_all_targets.csv")
         self._df = pd.read_csv(full_table_fn, index_col=0)
-        self._df.name = 'name'
+        self._df.name = "name"
 
         # fix some column dtypes
         self._df.order = self._df.order.astype(pd.Int64Dtype())
@@ -554,12 +546,11 @@ class DECATSchedule:
         self._df.dur = self._df.dur.map(lambda x: float(x.split()[0]) * u.min)
         self._df.dec = self._df.dec.map(lambda x: float(x.split()[0]) * u.deg)
         self._df.coord = self._df.apply(lambda x: SkyCoord(ra=x.ra, dec=x.dec), axis=1)
-        self._df.late_limit = self._df.late_limit.map(lambda x: Time(x, format='iso'))
-        self._df.early_limit = self._df.early_limit.map(lambda x: Time(x, format='iso'))
+        self._df.late_limit = self._df.late_limit.map(lambda x: Time(x, format="iso"))
+        self._df.early_limit = self._df.early_limit.map(lambda x: Time(x, format="iso"))
 
         # assume order may be updated, update times
         self._update_obs_times()
-
 
     def save(self):
         """Save in directory (date)."""
@@ -570,15 +561,13 @@ class DECATSchedule:
         self.to_obsplan_file(obsplan_fn)
         print(f"Obsplan and table saved to {save_dir}")
 
-
     def save_airmass_plot(self):
         """Display the airmass plot for [name]."""
         save_dir = f"../../decat_pointings/2025A/{self.date}"
         fig = self.ac.plot_airmass(
-            self._df, self.start_time, self.end_time,
-            [self.sidereal_shift, self.observer_shift]
+            self._df, self.start_time, self.end_time, [self.sidereal_shift, self.observer_shift]
         )
-        fig.savefig(os.path.join(save_dir, "airmass.png"), bbox_inches='tight', dpi=300)
+        fig.savefig(os.path.join(save_dir, "airmass.png"), bbox_inches="tight", dpi=300)
         plt.close()
 
 

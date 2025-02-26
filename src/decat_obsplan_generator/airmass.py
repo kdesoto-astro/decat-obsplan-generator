@@ -4,12 +4,12 @@ from pathlib import Path
 
 import astropy.units as u
 import matplotlib.dates as mdates
-import seaborn as sns
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
-import matplotlib.pyplot as plt
 
 from .helpers import ctio_location
 
@@ -48,7 +48,9 @@ class AirmassCalculator:
             has = np.nan * np.ones(len(times))
             if np.sum(times_valid) == 0:
                 return has
-            has[times_valid] = self._loc.local_sidereal_time(times[times_valid]).to(u.deg).value - ra.to(u.deg).value
+            has[times_valid] = (
+                self._loc.local_sidereal_time(times[times_valid]).to(u.deg).value - ra.to(u.deg).value
+            )
             return has
         except:
             if not isinstance(times, Time):
@@ -99,13 +101,13 @@ class AirmassCalculator:
         indices = np.argmin(differences, axis=1)
         nearest_hour_angles = self._ha_range[0, indices]
 
-        ha_df = pd.DataFrame({'ha': nearest_hour_angles, 'original_index': range(len(nearest_hour_angles))})
-        dec_df = dec_df.sort_values('ha').reset_index(drop=True)
-        merged_df = pd.merge(ha_df, dec_df, on='ha', how='left')
-        merged_df = merged_df.sort_values('original_index').reset_index(drop=True)
+        ha_df = pd.DataFrame({"ha": nearest_hour_angles, "original_index": range(len(nearest_hour_angles))})
+        dec_df = dec_df.sort_values("ha").reset_index(drop=True)
+        merged_df = pd.merge(ha_df, dec_df, on="ha", how="left")
+        merged_df = merged_df.sort_values("original_index").reset_index(drop=True)
 
         # Extract airmasses
-        airmasses = merged_df['airmass'].to_numpy()
+        airmasses = merged_df["airmass"].to_numpy()
         airmasses_full = np.nan * np.ones(len(abs_ha))
         airmasses_full[~oob_mask] = airmasses
 
@@ -128,8 +130,7 @@ class AirmassCalculator:
         return airmasses
 
     def query(self, times, ra, dec):
-        """Query from cache.
-        """
+        """Query from cache."""
         hour_angles = self._get_hour_angles(ra, times)
         airmasses = self._query_from_ha_dec(hour_angles, dec.to(u.deg).value)
         return airmasses
@@ -161,13 +162,12 @@ class AirmassCalculator:
         ax.plot(time_arr.to_datetime(), airmasses, **plot_kwargs)
 
         return ax
-    
 
     def plot_airmass(self, df, start_time, end_time, tz_shifts):
         """Plot airmass for entire dataframe of targets, highlighting
         current observing windows.
         """
-        fig = plt.figure(figsize=(10,4))
+        fig = plt.figure(figsize=(10, 4))
         ax1 = fig.add_subplot(111)
         ax2 = ax1.twiny()
         ax3 = ax1.twiny()
@@ -191,11 +191,11 @@ class AirmassCalculator:
 
         ax2.plot(full_night_linspace.to_datetime(), np.zeros(length_of_night))
         ax2.set_xlabel("UTC")
-        ax2.get_xaxis().set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax2.get_xaxis().set_major_formatter(mdates.DateFormatter("%H:%M"))
 
         num_ticks = 7
         nn = round(length_of_night / num_ticks)
-        ax3_ind = [i*nn for i in range(num_ticks)]
+        ax3_ind = [i * nn for i in range(num_ticks)]
 
         ax3.plot(full_night_sidereal.to_datetime(), np.zeros(length_of_night))
         ax3_ind.remove(0)
@@ -204,7 +204,7 @@ class AirmassCalculator:
         ax3.xaxis.set_label_position("bottom")
 
         ax3.set_xticks(full_night_sidereal[ax3_ind].to_datetime())
-        ax3.get_xaxis().set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax3.get_xaxis().set_major_formatter(mdates.DateFormatter("%H:%M"))
 
         # Offset the twin axis below the host
         ax3.spines["bottom"].set_position(("axes", -0.18))
@@ -213,16 +213,17 @@ class AirmassCalculator:
         program_colormap = {k: v for (k, v) in zip(df.program.unique(), colormap)}
 
         for k in program_colormap:
-            total_time = df.loc[df.program == k, 'dur'].sum()
+            total_time = df.loc[df.program == k, "dur"].sum()
             label = f"{k}\nTotal time: {round(total_time.value)} min"
             ax1.plot(
-                full_night_extra.to_datetime(), np.zeros(length_of_night),
+                full_night_extra.to_datetime(),
+                np.zeros(length_of_night),
                 color=program_colormap[k],
                 linewidth=3,
-                label=label
+                label=label,
             )
-            
-        ax1.get_xaxis().set_major_formatter(mdates.DateFormatter('%H:%M'))
+
+        ax1.get_xaxis().set_major_formatter(mdates.DateFormatter("%H:%M"))
 
         for row in df.itertuples():
             col = program_colormap[row.program]
@@ -230,31 +231,28 @@ class AirmassCalculator:
             if not pd.isna(row.order):
                 st = row.t_start_hidden
                 et = row.t_end_hidden
-                
+
                 obs_linspace = st + np.linspace(0, (et - st).to(u.hour).value, num=500) * u.hour
-                self._plot_single_airmass(
-                    ax2, row.ra, row.dec, times=obs_linspace,
-                    linewidth=3.0, color=col
-                )
+                self._plot_single_airmass(ax2, row.ra, row.dec, times=obs_linspace, linewidth=3.0, color=col)
 
                 self._plot_single_airmass(
-                    ax2, row.ra, row.dec,
-                    times=full_night_linspace,
-                    linewidth=3.0, color=col,
-                    alpha=0.1
+                    ax2, row.ra, row.dec, times=full_night_linspace, linewidth=3.0, color=col, alpha=0.1
                 )
-            
+
             else:
                 self._plot_single_airmass(
-                    ax2, row.ra, row.dec,
+                    ax2,
+                    row.ra,
+                    row.dec,
                     times=full_night_linspace,
-                    linewidth=3.0, color=col,
-                    linestyle='dotted',
-                    alpha=0.3
+                    linewidth=3.0,
+                    color=col,
+                    linestyle="dotted",
+                    alpha=0.3,
                 )
 
-        leg = ax1.legend(bbox_to_anchor=(1.01, 1.015), loc='upper left', ncol=1, prop={'size':8})
-        
+        leg = ax1.legend(bbox_to_anchor=(1.01, 1.015), loc="upper left", ncol=1, prop={"size": 8})
+
         # set the linewidth of each legend object
         for legobj in leg.legendHandles:
             legobj.set_linewidth(3.0)
